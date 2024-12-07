@@ -7,6 +7,7 @@ import {
   FlagIcon,
   PencilIcon,
   XMarkIcon,
+  CloudIcon,
 } from "@heroicons/react/24/solid";
 
 interface Todo {
@@ -17,6 +18,7 @@ interface Todo {
   priority: "low" | "medium" | "high";
   dueDate?: Date;
   tags?: string[];
+  googleCalendarEventId?: string;
 }
 
 const TodoList: React.FC = () => {
@@ -26,9 +28,69 @@ const TodoList: React.FC = () => {
   const [priority, setPriority] = useState<Todo["priority"]>("medium");
   const [dueDate, setDueDate] = useState<string>("");
   const [tags, setTags] = useState<string>("");
+  const [isGoogleCalendarConnected, setIsGoogleCalendarConnected] =
+    useState<boolean>(false);
 
   // State for editing existing todos
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
+
+  // Google Calendar Authentication
+  const handleGoogleCalendarAuth = async () => {
+    try {
+      // This would typically involve redirecting to Google's OAuth consent screen
+      const response = await fetch("/api/google-calendar/auth");
+      const authData = await response.json();
+
+      // Store tokens securely (typically in httpOnly cookie or secure storage)
+      localStorage.setItem("google_calendar_token", authData.token);
+      setIsGoogleCalendarConnected(true);
+    } catch (error) {
+      console.error("Google Calendar authentication failed", error);
+      alert("Failed to connect to Google Calendar");
+    }
+  };
+
+  // Sync todo to Google Calendar
+  const syncToGoogleCalendar = async (todo: Todo) => {
+    if (!isGoogleCalendarConnected) {
+      alert("Please connect to Google Calendar first");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/google-calendar/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem(
+            "google_calendar_token"
+          )}`,
+        },
+        body: JSON.stringify({
+          title: todo.title,
+          description: todo.description,
+          dueDate: todo.dueDate,
+          priority: todo.priority,
+        }),
+      });
+
+      const syncedEvent = await response.json();
+
+      // Update todo with Google Calendar event ID
+      const updatedTodo = {
+        ...todo,
+        googleCalendarEventId: syncedEvent.id,
+      };
+
+      // Update local state
+      setTodos(todos.map((t) => (t._id === todo._id ? updatedTodo : t)));
+
+      alert("Todo synced to Google Calendar!");
+    } catch (error) {
+      console.error("Failed to sync to Google Calendar", error);
+      alert("Failed to sync todo to Google Calendar");
+    }
+  };
 
   // Fetch todos
   const fetchTodos = async () => {
@@ -245,6 +307,22 @@ const TodoList: React.FC = () => {
           placeholder="Tags (comma-separated)"
           className="w-full p-2 border rounded"
         />
+
+        <div className="mb-4">
+          <button
+            onClick={handleGoogleCalendarAuth}
+            className={`flex items-center p-2 rounded ${
+              isGoogleCalendarConnected
+                ? "bg-green-500 text-white"
+                : "bg-blue-500 text-white"
+            }`}
+          >
+            <CloudIcon className="h-5 w-5 mr-2" />
+            {isGoogleCalendarConnected
+              ? "Google Calendar Connected"
+              : "Connect to Google Calendar"}
+          </button>
+        </div>
       </div>
 
       {/* Todo List */}
@@ -313,6 +391,14 @@ const TodoList: React.FC = () => {
                 title="Delete Todo"
               >
                 <TrashIcon className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => syncToGoogleCalendar(todo)}
+                className="text-purple-500"
+                title="Sync to Google Calendar"
+                disabled={!isGoogleCalendarConnected}
+              >
+                <CloudIcon className="h-5 w-5" />
               </button>
             </div>
           </li>
