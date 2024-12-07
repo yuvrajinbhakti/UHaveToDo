@@ -3,22 +3,70 @@ import connectDB from '@/lib/dbConnect';
 import { Todo } from '@/models/ToDo';
 
 export async function GET() {
+  await connectDB();
   try {
-    await connectDB();
     const todos = await Todo.find({}).sort({ createdAt: -1 });
     return NextResponse.json({ success: true, data: todos });
   } catch (error) {
-    return NextResponse.json({ success: false }, { status: 400 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }
 
 export async function POST(req: Request) {
+  await connectDB();
   try {
-    const body = await req.json(); // Get the request body
-    await connectDB();
-    const todo = await Todo.create(body);
+    const todo = await Todo.create(await req.json());
     return NextResponse.json({ success: true, data: todo }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ success: false }, { status: 400 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}
+
+export async function PUT(req: Request) {
+  await connectDB();
+  try {
+    // Extract the query parameter from the URL
+    const url = new URL(req.url);
+    const id = url.searchParams.get('id');  // Get 'id' query parameter
+    
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Missing todo ID' }, { status: 400 });
+    }
+
+    const todo = await Todo.findByIdAndUpdate(id, await req.json(), {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!todo) {
+      return NextResponse.json({ success: false }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, data: todo });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
+  }
+}
+
+export async function DELETE(req: Request) {
+  await connectDB();
+  try {
+    // Extract the query parameter from the URL
+    const url = new URL(req.url);
+    const id = url.searchParams.get('id');  // Get 'id' query parameter
+    
+    if (!id) {
+      return NextResponse.json({ success: false, message: 'Missing todo ID' }, { status: 400 });
+    }
+
+    const deletedTodo = await Todo.findByIdAndDelete(id);
+
+    if (!deletedTodo) {
+      return NextResponse.json({ success: false }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true, data: {} });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }
