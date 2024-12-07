@@ -5,6 +5,8 @@ import {
   CheckIcon,
   CalendarIcon,
   FlagIcon,
+  PencilIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/solid";
 
 interface Todo {
@@ -24,6 +26,9 @@ const TodoList: React.FC = () => {
   const [priority, setPriority] = useState<Todo["priority"]>("medium");
   const [dueDate, setDueDate] = useState<string>("");
   const [tags, setTags] = useState<string>("");
+
+  // State for editing existing todos
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
 
   // Fetch todos
   const fetchTodos = async () => {
@@ -69,6 +74,67 @@ const TodoList: React.FC = () => {
     } catch (error) {
       console.error("Failed to add todo", error);
     }
+  };
+
+  // Update todo
+  const updateTodo = async () => {
+    if (!editingTodo) return;
+
+    try {
+      const response = await fetch(`/api/todos?id=${editingTodo._id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newTodo,
+          description: description,
+          priority: priority,
+          dueDate: dueDate ? new Date(dueDate) : undefined,
+          tags: tags
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter(Boolean),
+        }),
+      });
+
+      const updatedTodoItem = await response.json();
+      setTodos(
+        todos.map((todo) =>
+          todo._id === editingTodo._id ? updatedTodoItem.data : todo
+        )
+      );
+
+      // Reset edit state and form
+      setEditingTodo(null);
+      setNewTodo("");
+      setDescription("");
+      setPriority("medium");
+      setDueDate("");
+      setTags("");
+    } catch (error) {
+      console.error("Failed to update todo", error);
+    }
+  };
+
+  // Start editing a todo
+  const startEditTodo = (todo: Todo) => {
+    setEditingTodo(todo);
+    setNewTodo(todo.title);
+    setDescription(todo.description || "");
+    setPriority(todo.priority);
+    setDueDate(
+      todo.dueDate ? new Date(todo.dueDate).toISOString().split("T")[0] : ""
+    );
+    setTags(todo.tags?.join(", ") || "");
+  };
+
+  // Cancel editing
+  const cancelEdit = () => {
+    setEditingTodo(null);
+    setNewTodo("");
+    setDescription("");
+    setPriority("medium");
+    setDueDate("");
+    setTags("");
   };
 
   // Toggle todo completion
@@ -127,11 +193,19 @@ const TodoList: React.FC = () => {
             required
           />
           <button
-            onClick={addTodo}
+            onClick={editingTodo ? updateTodo : addTodo}
             className="bg-blue-500 text-white p-2 rounded-r-md"
           >
-            <PlusIcon className="h-6 w-6" />
+            {editingTodo ? "Update" : <PlusIcon className="h-6 w-6" />}
           </button>
+          {editingTodo && (
+            <button
+              onClick={cancelEdit}
+              className="bg-red-500 text-white p-2 ml-2 rounded"
+            >
+              <XMarkIcon className="h-6 w-6" />
+            </button>
+          )}
         </div>
 
         {/* Additional Todo Details */}
@@ -217,6 +291,13 @@ const TodoList: React.FC = () => {
               )}
             </div>
             <div className="flex space-x-2">
+              <button
+                onClick={() => startEditTodo(todo)}
+                className="text-blue-500"
+                title="Edit Todo"
+              >
+                <PencilIcon className="h-5 w-5" />
+              </button>
               <button
                 onClick={() => toggleTodo(todo)}
                 className="text-green-500"

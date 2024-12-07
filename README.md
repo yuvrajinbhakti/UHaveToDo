@@ -1,3 +1,8 @@
+Vision - 
+Sync with calendar
+Add sorting and filtering options
+Implement local storage or persistence
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
